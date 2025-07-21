@@ -1,71 +1,86 @@
 import { useState } from "react";
 import { Registry } from "@cosmjs/proto-signing";
-import { assertIsBroadcastTxSuccess, SigningStargateClient, GasPrice } from "@cosmjs/stargate";
+import { SigningStargateClient, assertIsBroadcastTxSuccess, GasPrice } from "@cosmjs/stargate";
 import { MsgIssue } from "coreum-js/src/codegen/coreum/asset/ft/v1/tx";
+import { coins } from "@cosmjs/amino";
 
 const rpc = "https://full-node.testnet-1.coreum.dev:26657";
 
 const App = () => {
   const [log, setLog] = useState("Ready.");
 
-  const appendLog = (msg: string) => {
-    setLog((prev) => `${prev}\n${msg}`);
+  const appendLog = (message: string) => {
+    setLog((prev) => prev + "\n" + message);
   };
 
   const handleMint = async () => {
     try {
       appendLog("🔍 Connecting to wallet...");
-      const offlineSigner = await window.keplr.getOfflineSignerAuto("coreum-testnet");
+
+      const chainId = "coreum-testnet";
+      await window.keplr.enable(chainId);
+      const offlineSigner = await window.getOfflineSignerAuto(chainId);
       const accounts = await offlineSigner.getAccounts();
       const sender = accounts[0].address;
-      appendLog(`🔑 Wallet connected: ${sender}`);
 
+      appendLog(`🔑 Wallet connected: ${sender}`);
+      
+      // Fetch wallet balance for debug
+      const tempClient = await SigningStargateClient.connect(rpc);
+      const balance = await tempClient.getAllBalances(sender);
+      appendLog(`💰 Wallet balance: ${balance.map(b => b.amount + b.denom).join(", ")}`);
+
+      // Register MsgIssue
       const registry = new Registry();
       registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
       appendLog("📦 MsgIssue registered with registry.");
 
-      const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, {
-        registry,
-        gasPrice: GasPrice.fromString("0.25ucore"),
-      });
-      appendLog("🔗 Connected to Coreum RPC.");
+      const gasPrice = GasPrice.fromString("0.25ucore");
+      const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, { registry, gasPrice });
+      appendLog("🔌 StargateClient ready.");
 
       const msg = {
         typeUrl: "/coreum.asset.ft.v1.MsgIssue",
         value: MsgIssue.fromPartial({
           issuer: sender,
-          symbol: "TESTTOKEN",
-          subunit: "utesttoken",
+          symbol: "SOLOPASS",
+          subunit: "spass",
           precision: 6,
           initialAmount: "1000",
-          description: "Minted from demo",
-          features: [],
+          description: "Soulbound Auth Token",
+          features: ["burning", "freezing"],
         }),
       };
 
-      appendLog("📝 MsgIssue constructed.");
+      appendLog("🧱 Msg constructed. Broadcasting mint transaction...");
 
       const fee = {
-        amount: [{ denom: "ucore", amount: "100000" }],
+        amount: coins(50000, "ucore"),
         gas: "200000",
       };
 
       const result = await client.signAndBroadcast(sender, [msg], fee);
-      assertIsBroadcastTxSuccess(result);
-      appendLog(`✅ Mint Success! TX Hash: ${result.transactionHash}`);
+
+      if (result.code === 0) {
+        appendLog("✅ Mint successful! TxHash: " + result.transactionHash);
+      } else {
+        appendLog("⚠️ Tx failed: " + result.rawLog);
+      }
     } catch (err) {
       console.error(err);
-      appendLog(`⚠️ Error: ${err.message || err.toString()}`);
+      appendLog("❌ Error: " + (err.message || JSON.stringify(err)));
     }
   };
 
   return (
-    <div style={{ marginTop: "2rem", background: "#000", color: "#0f0", padding: "1rem" }}>
-      <h1>Smart Token Mint Demo</h1>
-      <button onClick={handleMint} style={{ padding: "0.5rem", margin: "1rem 0" }}>
-        Mint Smart Token
-      </button>
-      <pre>{log}</pre>
+    <div style={{ padding: "2rem", fontFamily: "monospace", color: "#0f0", background: "#111", height: "100vh" }}>
+      <h1 style={{ color: "#0f0", textAlign: "center" }}>🚀 Mint SoloPass Token <span style={{ fontSize: "1rem" }}>(Live Log)</span></h1>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+        <button onClick={handleMint} style={{ background: "#0f0", color: "#000", fontWeight: "bold", padding: "0.75rem 1.5rem", border: "none", borderRadius: "0.5rem", cursor: "pointer" }}>
+          Mint Smart Token
+        </button>
+      </div>
+      <pre style={{ background: "#000", border: "1px solid #0f0", padding: "1rem", height: "300px", overflowY: "auto" }}>{log}</pre>
     </div>
   );
 };
