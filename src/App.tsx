@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Registry } from "@cosmjs/proto-signing";
+import { Registry, GeneratedType } from "@cosmjs/proto-signing";
 import {
   assertIsBroadcastTxSuccess,
   SigningStargateClient,
@@ -25,8 +25,12 @@ const App = () => {
       appendLog(`🔑 Wallet connected: ${sender}`);
 
       const registry = new Registry();
-      registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
-      appendLog("📦 MsgIssue registered with registry.");
+      registry.register("/coreum.asset.ft.v1.MsgIssue", {
+        encode: MsgIssue.encode,
+        decode: MsgIssue.decode,
+        fromPartial: MsgIssue.fromPartial,
+      } as GeneratedType);
+      appendLog("📦 MsgIssue properly registered with encode/decode/fromPartial.");
 
       appendLog("🔗 Connecting to RPC...");
       const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, {
@@ -45,7 +49,7 @@ const App = () => {
         features: [],
       };
 
-      appendLog("📤 MsgIssue value prepared:");
+      appendLog("📤 MsgIssue value:");
       appendLog(JSON.stringify(msgValue, null, 2));
 
       const msg = {
