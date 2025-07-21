@@ -1,76 +1,70 @@
-import { useEffect, useState } from "react";
-import {
-  MsgIssue,
-} from "coreum-js/lib/esm/asset/ft/v1/tx";
-import {
-  Registry,
-  encodePubkey,
-  OfflineSigner,
-} from "@cosmjs/proto-signing";
-import { SigningStargateClient } from "@cosmjs/stargate";
-import "./App.css";
-
-const registry = new Registry();
-registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
+import { useState } from "react";
+import { SigningStargateClient, assertIsBroadcastTxSuccess, GasPrice } from "@cosmjs/stargate";
+import { Registry } from "@cosmjs/proto-signing";
+import { MsgIssue } from "coreum-js/dist/codegen/coreum/asset/ft/v1/tx";
 
 const rpc = "https://full-node.testnet-1.coreum.dev:26657";
 
 function App() {
-  const [status, setStatus] = useState("Ready.");
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [log, setLog] = useState("Ready.");
 
   const handleMint = async () => {
     try {
-      setStatus("🔍 Connecting to wallet...");
+      setLog((prev) => prev + "\n🔍 Connecting to wallet...");
 
-      const offlineSigner: OfflineSigner = window.keplr.getOfflineSigner("coreum-testnet");
+      await window.keplr.enable("coreum-testnet");
+      const offlineSigner = window.getOfflineSigner("coreum-testnet");
       const accounts = await offlineSigner.getAccounts();
-      const address = accounts[0].address;
-      setWalletAddress(address);
+      const sender = accounts[0].address;
 
-      setStatus(`🔑 Wallet connected: ${address}`);
+      setLog((prev) => prev + `\n🔑 Wallet connected: ${sender}`);
 
-      const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, { registry });
+      const registry = new Registry();
+      registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
 
-      const msg: MsgIssue = {
-        issuer: address,
-        symbol: "SOLPASS",
-        subunit: "usolpass",
-        precision: 6,
-        initialAmount: "1",
-        description: "SoloPass Demo Token",
-        features: [],
-        burnRate: "0.00",
-        sendCommissionRate: "0.00"
+      const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, {
+        registry,
+        gasPrice: GasPrice.fromString("0.25ucore"),
+      });
+
+      const msg = {
+        typeUrl: "/coreum.asset.ft.v1.MsgIssue",
+        value: MsgIssue.fromPartial({
+          issuer: sender,
+          symbol: "DEMO",
+          subunit: "udemo",
+          precision: 6,
+          initialAmount: "1000000",
+          description: "Demo Token",
+          features: [],
+        }),
       };
 
-      setStatus("🚀 Broadcasting mint transaction...");
+      const fee = {
+        amount: [{ denom: "ucore", amount: "5000" }],
+        gas: "200000",
+      };
 
-      const result = await client.signAndBroadcast(address, [{
-        typeUrl: "/coreum.asset.ft.v1.MsgIssue",
-        value: msg
-      }], "auto");
+      setLog((prev) => prev + "\n🚀 Broadcasting mint transaction...");
 
-      if (result.code === 0) {
-        setStatus(`✅ Success! TX Hash: ${result.transactionHash}`);
-      } else {
-        setStatus(`❌ Failed! Code: ${result.code}, Log: ${result.rawLog}`);
-      }
+      const result = await client.signAndBroadcast(sender, [msg], fee);
+      assertIsBroadcastTxSuccess(result);
 
-    } catch (err: any) {
+      setLog((prev) => prev + `\n✅ Minted successfully! TX hash: ${result.transactionHash}`);
+    } catch (err) {
       console.error(err);
-      setStatus(`⚠️ Error: ${err.message || err.toString()}`);
+      setLog((prev) => prev + `\n⚠️ Error: ${err.message}`);
     }
   };
 
   return (
-    <div className="container">
-      <h1>🎟️ SoloPass Mint Demo</h1>
-      <p>Click below to mint a smart token on Coreum Testnet</p>
+    <div style={{ fontFamily: "monospace", padding: "2rem" }}>
+      <h1>🪙 Smart Token Mint Demo</h1>
       <button onClick={handleMint}>Mint Token</button>
-      <pre>{status}</pre>
+      <pre>{log}</pre>
     </div>
   );
 }
 
 export default App;
+
