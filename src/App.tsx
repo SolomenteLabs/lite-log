@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Registry } from "@cosmjs/proto-signing";
 import { SigningStargateClient, assertIsBroadcastTxSuccess, GasPrice } from "@cosmjs/stargate";
-import { MsgIssue } from "coreum-js/src/codegen/coreum/asset/ft/v1/tx";
+import { MsgIssue } from "coreum-js";
 import { coins } from "@cosmjs/amino";
 
 const rpc = "https://full-node.testnet-1.coreum.dev:26657";
@@ -23,14 +23,12 @@ const App = () => {
       const accounts = await offlineSigner.getAccounts();
       const sender = accounts[0].address;
 
-      appendLog(`🔑 Wallet connected: ${sender}`);
-      
-      // Fetch wallet balance for debug
+      appendLog(\`🔑 Wallet connected: \${sender}\`);
+
       const tempClient = await SigningStargateClient.connect(rpc);
       const balance = await tempClient.getAllBalances(sender);
-      appendLog(`💰 Wallet balance: ${balance.map(b => b.amount + b.denom).join(", ")}`);
+      appendLog(\`💰 Wallet balance: \${balance.map(b => b.amount + b.denom).join(", ")}\`);
 
-      // Register MsgIssue
       const registry = new Registry();
       registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
       appendLog("📦 MsgIssue registered with registry.");
