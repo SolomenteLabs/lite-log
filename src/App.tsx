@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { assertIsBroadcastTxSuccess, SigningStargateClient } from "@cosmjs/stargate";
 import { Registry } from "@cosmjs/proto-signing";
-import { MsgIssue } from "coreum-js";
-import { GasPrice } from "@cosmjs/stargate";
+import { assertIsBroadcastTxSuccess, SigningStargateClient, GasPrice } from "@cosmjs/stargate";
+import { MsgIssue } from "coreum-js/src/codegen/coreum/asset/ft/v1/tx";
 
 const rpc = "https://full-node.testnet-1.coreum.dev:26657";
 
@@ -10,7 +9,7 @@ const App = () => {
   const [log, setLog] = useState("Ready.");
 
   const appendLog = (msg: string) => {
-    setLog((prev) => prev + "\n" + msg);
+    setLog((prev) => `${prev}\n${msg}`);
   };
 
   const handleMint = async () => {
@@ -23,53 +22,49 @@ const App = () => {
 
       const registry = new Registry();
       registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
-      appendLog("📦 MsgIssue type registered in Registry.");
+      appendLog("📦 MsgIssue registered with registry.");
 
       const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, {
         registry,
         gasPrice: GasPrice.fromString("0.25ucore"),
       });
-
-      appendLog("🔧 Stargate client connected.");
-
-      const balances = await client.getAllBalances(sender);
-      appendLog(`💰 Wallet Balances: ${JSON.stringify(balances)}`);
+      appendLog("🔗 Connected to Coreum RPC.");
 
       const msg = {
         typeUrl: "/coreum.asset.ft.v1.MsgIssue",
         value: MsgIssue.fromPartial({
           issuer: sender,
-          symbol: "TEST",
-          subunit: "utest",
+          symbol: "TESTTOKEN",
+          subunit: "utesttoken",
           precision: 6,
-          initialAmount: "1000000",
-          description: "Test Token",
+          initialAmount: "1000",
+          description: "Minted from demo",
           features: [],
         }),
       };
 
-      appendLog(`📨 Msg constructed: ${JSON.stringify(msg)}`);
+      appendLog("📝 MsgIssue constructed.");
 
       const fee = {
-        amount: [{ denom: "ucore", amount: "5000" }],
+        amount: [{ denom: "ucore", amount: "100000" }],
         gas: "200000",
       };
 
-      appendLog("🚀 Broadcasting mint transaction...");
-
       const result = await client.signAndBroadcast(sender, [msg], fee);
       assertIsBroadcastTxSuccess(result);
-
-      appendLog("✅ Mint successful: " + JSON.stringify(result));
-    } catch (err: any) {
-      appendLog(`⚠️ Error: ${err.message || err}`);
+      appendLog(`✅ Mint Success! TX Hash: ${result.transactionHash}`);
+    } catch (err) {
+      console.error(err);
+      appendLog(`⚠️ Error: ${err.message || err.toString()}`);
     }
   };
 
   return (
-    <div style={{ fontFamily: "monospace", marginTop: "2rem", background: "#000", color: "#0f0", padding: "1rem" }}>
-      <h2>🧪 Coreum Mint Demo (Testnet)</h2>
-      <button onClick={handleMint} style={{ margin: "1rem 0", padding: "0.5rem 1rem" }}>Mint</button>
+    <div style={{ marginTop: "2rem", background: "#000", color: "#0f0", padding: "1rem" }}>
+      <h1>Smart Token Mint Demo</h1>
+      <button onClick={handleMint} style={{ padding: "0.5rem", margin: "1rem 0" }}>
+        Mint Smart Token
+      </button>
       <pre>{log}</pre>
     </div>
   );
