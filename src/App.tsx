@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Registry } from "@cosmjs/proto-signing";
-import { assertIsBroadcastTxSuccess, SigningStargateClient, GasPrice } from "@cosmjs/stargate";
+import {
+  assertIsBroadcastTxSuccess,
+  SigningStargateClient,
+  GasPrice,
+} from "@cosmjs/stargate";
 import { MsgIssue } from "coreum-js/src/codegen/coreum/asset/ft/v1/tx";
 
 const rpc = "https://full-node.testnet-1.coreum.dev:26657";
@@ -24,32 +28,37 @@ const App = () => {
       registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
       appendLog("📦 MsgIssue registered with registry.");
 
+      appendLog("🔗 Connecting to RPC...");
       const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, {
         registry,
         gasPrice: GasPrice.fromString("0.25ucore"),
       });
-      appendLog("🔗 Connected to Coreum RPC.");
+      appendLog("🔌 Stargate client ready.");
+
+      const msgValue = {
+        issuer: sender,
+        symbol: "TESTTOKEN",
+        subunit: "utesttoken",
+        precision: 6,
+        initialAmount: "1000",
+        description: "Minted from demo",
+        features: [],
+      };
+
+      appendLog("📤 MsgIssue value prepared:");
+      appendLog(JSON.stringify(msgValue, null, 2));
 
       const msg = {
         typeUrl: "/coreum.asset.ft.v1.MsgIssue",
-        value: MsgIssue.fromPartial({
-          issuer: sender,
-          symbol: "TESTTOKEN",
-          subunit: "utesttoken",
-          precision: 6,
-          initialAmount: "1000",
-          description: "Minted from demo",
-          features: [],
-        }),
+        value: MsgIssue.fromPartial(msgValue),
       };
-
-      appendLog("📝 MsgIssue constructed.");
 
       const fee = {
         amount: [{ denom: "ucore", amount: "100000" }],
         gas: "200000",
       };
 
+      appendLog("🚀 Broadcasting mint transaction...");
       const result = await client.signAndBroadcast(sender, [msg], fee);
       assertIsBroadcastTxSuccess(result);
       appendLog(`✅ Mint Success! TX Hash: ${result.transactionHash}`);
