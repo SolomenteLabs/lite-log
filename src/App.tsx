@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { SigningStargateClient, assertIsBroadcastTxSuccess, GasPrice } from "@cosmjs/stargate";
+import { assertIsBroadcastTxSuccess, SigningStargateClient, GasPrice } from "@cosmjs/stargate";
 import { Registry } from "@cosmjs/proto-signing";
-import { MsgIssue } from "coreum-js/dist/codegen/coreum/asset/ft/v1/tx";
+import { MsgIssue } from "coreum-js/dist/codegen/coreum/asset/ft/v1/tx"; // ✅ Correct path
 
 const rpc = "https://full-node.testnet-1.coreum.dev:26657";
 
@@ -10,15 +10,16 @@ function App() {
 
   const handleMint = async () => {
     try {
-      setLog((prev) => prev + "\n🔍 Connecting to wallet...");
+      setLog((log) => log + "\n🔍 Connecting to wallet...");
 
       await window.keplr.enable("coreum-testnet");
       const offlineSigner = window.getOfflineSigner("coreum-testnet");
       const accounts = await offlineSigner.getAccounts();
       const sender = accounts[0].address;
 
-      setLog((prev) => prev + `\n🔑 Wallet connected: ${sender}`);
+      setLog((log) => log + `\n🔑 Wallet connected: ${sender}`);
 
+      // ✅ Register MsgIssue with correct type URL
       const registry = new Registry();
       registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
 
@@ -45,15 +46,15 @@ function App() {
         gas: "200000",
       };
 
-      setLog((prev) => prev + "\n🚀 Broadcasting mint transaction...");
+      setLog((log) => log + "\n🚀 Broadcasting mint transaction...");
 
       const result = await client.signAndBroadcast(sender, [msg], fee);
       assertIsBroadcastTxSuccess(result);
 
-      setLog((prev) => prev + `\n✅ Minted successfully! TX hash: ${result.transactionHash}`);
+      setLog((log) => log + `\n✅ Minted! TX Hash: ${result.transactionHash}`);
     } catch (err) {
       console.error(err);
-      setLog((prev) => prev + `\n⚠️ Error: ${err.message}`);
+      setLog((log) => log + `\n⚠️ Error: ${err.message}`);
     }
   };
 
