@@ -1,75 +1,74 @@
 import { useState } from "react";
-import { assertIsBroadcastTxSuccess, SigningStargateClient, GasPrice, coins } from "@cosmjs/stargate";
-import { MsgIssue } from "coreum-js/src/codegen/coreum/asset/ft/v1/tx";
+import { MsgIssue } from "coreum-js/dist/codegen/coreum/asset/ft/v1/tx";
 import { Registry } from "@cosmjs/proto-signing";
+import { GasPrice, SigningStargateClient, assertIsBroadcastTxSuccess } from "@cosmjs/stargate";
 
 const rpc = "https://full-node.testnet-1.coreum.dev:26657";
 
-export default function App() {
+const App = () => {
   const [log, setLog] = useState("Ready.");
 
-  const appendLog = (msg: string) => {
-    setLog((prev) => `${prev}\n${msg}`);
+  const appendLog = (message: string) => {
+    setLog((prev) => prev + "\n" + message);
   };
 
   const handleMint = async () => {
     try {
       appendLog("🔍 Connecting to wallet...");
-      const wallet = await window.keplr.getOfflineSignerAuto("coreum-testnet");
-      const accounts = await wallet.getAccounts();
+      const offlineSigner = await window.keplr.getOfflineSignerAuto("coreum-testnet");
+      const accounts = await offlineSigner.getAccounts();
       const sender = accounts[0].address;
-
       appendLog(`🔑 Wallet connected: ${sender}`);
-      appendLog(`🧾 Accounts:\n${JSON.stringify(accounts, null, 2)}`);
 
+      // Register MsgIssue
       const registry = new Registry();
       registry.register("/coreum.asset.ft.v1.MsgIssue", MsgIssue);
+      appendLog("📦 MsgIssue registered with registry.");
 
-      const client = await SigningStargateClient.connectWithSigner(rpc, wallet, {
+      const client = await SigningStargateClient.connectWithSigner(rpc, offlineSigner, {
         registry,
         gasPrice: GasPrice.fromString("0.25ucore"),
       });
+      appendLog("⚙️ Stargate client connected with registry.");
 
-      const msg = {
-        typeUrl: "/coreum.asset.ft.v1.MsgIssue",
-        value: MsgIssue.fromPartial({
-          issuer: sender,
-          symbol: "DEBUG",
-          subunit: "udebug",
-          precision: 6,
-          initialAmount: "1000000",
-          description: "Debug token from UI",
-          features: [],
-        }),
+      const msg: MsgIssue = {
+        issuer: sender,
+        symbol: "DEMO",
+        subunit: "udemo",
+        precision: 6,
+        initialAmount: "1000000",
+        description: "Testnet Demo Token",
+        features: ["minting", "burning"],
       };
-
-      appendLog(`📦 MsgIssue payload:\n${JSON.stringify(msg.value, null, 2)}`);
 
       const fee = {
-        amount: coins(5000, "ucore"),
-        gas: "200000",
+        amount: [{ denom: "ucore", amount: "250000" }],
+        gas: "1000000",
       };
 
-      appendLog(`💸 Fee object:\n${JSON.stringify(fee, null, 2)}`);
-      appendLog("🚀 Broadcasting mint transaction...");
+      const result = await client.signAndBroadcast(sender, [{
+        typeUrl: "/coreum.asset.ft.v1.MsgIssue",
+        value: msg,
+      }], fee);
 
-      const result = await client.signAndBroadcast(sender, [msg], fee);
       assertIsBroadcastTxSuccess(result);
-
-      appendLog(`✅ Mint succeeded! TX hash:\n${result.transactionHash}`);
-    } catch (err) {
-      appendLog(`⚠️ Error:\n${(err as Error).message}`);
+      appendLog(`✅ Token minted! TxHash: ${result.transactionHash}`);
+    } catch (err: any) {
+      appendLog(`⚠️ Error: ${err.message || err.toString()}`);
     }
   };
 
   return (
-    <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap", padding: "2rem" }}>
-      <h1>Mint Debug Token</h1>
-      <button onClick={handleMint} style={{ fontSize: "1rem", padding: "0.5rem 1rem" }}>
-        Mint
+    <div style={{ fontFamily: "monospace", padding: "2rem", maxWidth: "600px", margin: "auto" }}>
+      <h1>Smart Token Mint Demo</h1>
+      <button onClick={handleMint} style={{ padding: "1rem", fontSize: "1.2rem" }}>
+        🪙 Mint Token
       </button>
-      <pre>{log}</pre>
+      <pre style={{ marginTop: "2rem", background: "#000", color: "#0f0", padding: "1rem" }}>
+        {log}
+      </pre>
     </div>
   );
-}
+};
 
+export default App;
